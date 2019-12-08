@@ -1,22 +1,192 @@
 <html>
 <head>
-<link href="https://fonts.googleapis.com/css?family=Indie+Flower|Permanent+Marker&display=swap" rel="stylesheet">
-<style>
-.one {
-  text-align: center;
-  font-family: 'Permanent Marker', cursive;
-  font-size: 25.5vw;
-}
+    <link href="https://fonts.googleapis.com/css?family=Indie+Flower|Permanent+Marker&display=swap" rel="stylesheet">
 
-.two {
-  text-align: center;
-  font-family: 'Indie Flower', cursive;
-  font-size: 25.5vw;
-} 
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.4/lodash.min.js"></script>
+    <script src="third-party/compromise.min.js"></script>
+    <script src="third-party/compromise-sentences.min.js"></script>
+    <script src="third-party/compromise-syllables.min.js"></script>
 
-</style>
+    <script>
+        nlp.extend(compromiseSyllables);
+        nlp.extend(compromiseSentences);
+    </script>
+    <script src="js/markov.js"></script>
+    <style>
+        html, body {
+            height: 100%;
+        }
+
+        html {
+            display: table;
+            margin: auto;
+        }
+
+        body {
+            display: table-cell;
+            vertical-align: middle;
+        }
+
+        .one {
+            text-align: center;
+            font-family: 'Permanent Marker', cursive;
+            font-size: 4.5vw;
+        }
+
+        .one::first-letter, .two::first-letter {
+            font-size: 8.5vw;
+        }
+
+        .two {
+            text-align: center;
+            font-family: 'Indie Flower', cursive;
+            font-size: 4.5vw;
+        }
+    </style>
 </head>
 <body>
-<h1 class="one">hello</h1><h1 class="two">world</h1>
+<h1 class="one" id="line_1">hello</h1>
+<h1 class="two" id="line_2">there</h1>
+<h1 class="one" id="line_3">world</h1>
+<script>
+    var quotes =
+        "Few are those who see with their own eyes and feel with their own hearts. " +
+        "Imagination is more important than knowledge. Knowledge is limited. Imagination encircles the world. " +
+        "Unthinking respect for authority is the greatest enemy of truth. " +
+        "Try not to become a man of success, but rather try to become a man of value. " +
+        "I am by heritage a Jew, by citizenship a Swiss, and by makeup a human being, and only a human being, without any special attachment to any state or national entity whatsoever. " +
+        "Great spirits have always encountered violent opposition from mediocre minds. " +
+        "I would teach peace rather than war. I would inculcate love rather than hate. " +
+        "I believe in intuitions and inspirations. I sometimes feel that I am right. I do not know that I am. " +
+        "Look deep into nature, and then you will understand everything better. " +
+        "All religions, arts and sciences are branches of the same tree. " +
+        "A hundred times every day I remind myself that my inner and outer life are based on the labors of other men, living and dead, and that I must exert myself in order to give in the same measure as I have received and am still receiving. " +
+        "A man should look for what is, and not for what he thinks should be. " +
+        "The most beautiful experience we can have is the mysterious. " +
+        "I believe in standardizing automobiles. I do not believe in standardizing human beings. " +
+        "It is, in fact, nothing short of a miracle that the modern methods of instruction have not yet entirely strangled the holy curiosity of inquiry" +
+        "A table, a chair, a bowl of fruit and a violin; what else does a man need to be happy?" +
+        "A human being is part of a whole called by us “Universe.”" +
+        "The important thing is to not stop questioning. Curiosity has its own reason for existing. " +
+        "A question that sometimes drives me hazy — am I or are the others crazy?" +
+        "The world is in greater peril from those who tolerate or encourage evil than from those who actually commit it" +
+        "Life is like riding a bicycle. To keep your balance you must keep moving. " +
+        "Concern for man and his fate must always form the chief interest of all technical endeavors. Never forget this in the midst of your diagrams and equations. " +
+        "I love to travel, but I hate to arrive. " +
+        "All that is valuable in human society depends upon the opportunity for development accorded the individual. " +
+        "The important thing is not to stop questioning. Curiosity has its own reason for existence. " +
+        "Although I am a typical loner in daily life, my consciousness of belonging to the invisible community of those who strive for truth, beauty, and justice has preserved me from feeling isolated. " +
+        "The years of anxious searching in the dark, with their intense longing, their alternations of confidence and exhaustion, and final emergence into light—only those who have experienced it can understand that. " +
+        "Let us not forget that human knowledge and skills alone cannot lead humanity to a happy and dignified life" +
+        "He who can no longer pause to wonder and stand rapt in awe, is as good as dead; his eyes are closed. " +
+        "I have no special talent. I am only passionately curious. " +
+        " Invention is not the product of logical thought, even though the final product is tied to a logical structure. " +
+        "Science can flourish only in an atmosphere of free speech. " +
+        "Hail to the man who went through life always helping others, knowing no fear, and to whom aggressiveness and resentment are alien" +
+        "A happy man is too satisfied with the present to dwell too much on the future. " +
+        "I speak to everyone in the same way, whether he is the garbage man or the president of the university. " +
+        "Man would indeed be in a poor way if he had to be restrained by fear of punishment and hopes of reward after death. " +
+        "The great moral teachers of humanity were, in a way, artistic geniuses in the art of living. " +
+        "Out yonder there was this huge world, which exists independently of us human beings and which stands before us like a great, eternal riddle, at least partially accessible to our inspection and thinking. The contemplation of this world beckoned like a liberation"
+    ;
+
+
+    var nature = "Spiders (order Araneae) are air-breathing arthropods that have eight legs and chelicerae with fangs able to inject venom. They are the largest order of arachnids and rank seventh in total species diversity among all orders of organisms.[2] Spiders are found worldwide on every continent except for Antarctica, and have become established in nearly every habitat with the exceptions of air and sea colonization. As of July 2019, at least 48,200 spider species, and 120 families have been recorded by taxonomists.[1] However, there has been dissension within the scientific community as to how all these families should be classified, as evidenced by the over 20 different classifications that have been proposed since 1900.[3] " +
+        "Anatomically, spiders differ from other arthropods in that the usual body segments are fused into two tagmata, the cephalothorax and abdomen, and joined by a small, cylindrical pedicel. Unlike insects, spiders do not have antennae. In all except the most primitive group, the Mesothelae, spiders have the most centralized nervous systems of all arthropods, as all their ganglia are fused into one mass in the cephalothorax. Unlike most arthropods, spiders have no extensor muscles in their limbs and instead extend them by hydraulic pressure. " +
+        "Their abdomens bear appendages that have been modified into spinnerets that extrude silk from up to six types of glands. Spider webs vary widely in size, shape and the amount of sticky thread used. It now appears that the spiral orb web may be one of the earliest forms, and spiders that produce tangled cobwebs are more abundant and diverse than orb-web spiders. Spider-like arachnids with silk-producing spigots appeared in the Devonian period about 386 million years ago, but these animals apparently lacked spinnerets. True spiders have been found in Carboniferous rocks from 318 to 299 million years ago, and are very similar to the most primitive surviving suborder, the Mesothelae. The main groups of modern spiders, Mygalomorphae and Araneomorphae, first appeared in the Triassic period, before 200 million years ago. " +
+        "The species Bagheera kiplingi was described as herbivorous in 2008,[4] but all other known species are predators, mostly preying on insects and on other spiders, although a few large species also take birds and lizards. It is estimated that the world's 25 million tons of spiders kill 400–800 million tons of prey per year.[5] Spiders use a wide range of strategies to capture prey: trapping it in sticky webs, lassoing it with sticky bolas, mimicking the prey to avoid detection, or running it down. Most detect prey mainly by sensing vibrations, but the active hunters have acute vision, and hunters of the genus Portia show signs of intelligence in their choice of tactics and ability to develop new ones. Spiders' guts are too narrow to take solids, so they liquefy their food by flooding it with digestive enzymes. They also grind food with the bases of their pedipalps, as arachnids do not have the mandibles that crustaceans and insects have. " +
+        "To avoid being eaten by the females, which are typically much larger, male spiders identify themselves to potential mates by a variety of complex courtship rituals. Males of most species survive a few matings, limited mainly by their short life spans. Females weave silk egg-cases, each of which may contain hundreds of eggs. Females of many species care for their young, for example by carrying them around or by sharing food with them. A minority of species are social, building communal webs that may house anywhere from a few to 50,000 individuals. Social behavior ranges from precarious toleration, as in the widow spiders, to co-operative hunting and food-sharing. Although most spiders live for at most two years, tarantulas and other mygalomorph spiders can live up to 25 years in captivity. " +
+        "While the venom of a few species is dangerous to humans, scientists are now researching the use of spider venom in medicine and as non-polluting pesticides. Spider silk provides a combination of lightness, strength and elasticity that is superior to that of synthetic materials, and spider silk genes have been inserted into mammals and plants to see if these can be used as silk factories. As a result of their wide range of behaviors, spiders have become common symbols in art and mythology symbolizing various combinations of patience, cruelty and creative powers. An abnormal fear of spiders is called arachnophobia."
+
+    var inspire = "Love and desire are the spirit's wings to great deeds. " +
+        "Believe you can and you're halfway there. " +
+        "Be more concerned with your character than with your reputation. Your character is what you really are, while your reputation is merely what others think you are. " +
+        "Change your thoughts and you change your world. " +
+        "What great thing would you attempt if you knew you could not fail? " +
+        "Success is never final. Failure is never fatal. It is courage that counts. " +
+        "Edison failed 10, 000 times before he made the electric light. Do not be discouraged if you fail a few times. " +
+        "If you find yourself in a hole, the first thing to do is stop digging. " +
+        "Out of clutter, find Simplicity. From discord, find Harmony. In the middle of difficulty lies Opportunity. " +
+        "Look within. Within is the fountain of good, and it will ever bubble up, if thou wilt ever dig. " +
+        "The glow of one warm thought is to me worth more than money. " +
+        "Work is 1% inspiration plus 99% transpiration " +
+        "A compliment is something like a kiss through a veil. " +
+        "Belief creates the actual fact. " +
+        "Don't judge each day by the harvest you reap but by the seeds that you plant. " +
+        "Judge each day not by the harvest you reap but by the seeds you plant. " +
+        "The best way out is always through. " +
+        "We can't help everyone, but everyone can help someone. " +
+        "We convince by our presence. " +
+        "With self-discipline most anything is possible." +
+        "Whenever you find yourself on the side of the majority, it is time to pause and reflect. " +
+        "He who is devoid of the power to forgive is devoid of the power to love. " +
+        "Help us to be thankful for this day and every day and treat each one as a preciousgem to be filled to the full with meaning and with love. " +
+        "Young people need models, not critics " +
+        "Each morning when I open my eyes I say to myself: I, not events, have the power to make me happy or unhappy today. I can choose which it shall be. Yesterday is dead, tomorrow hasn't arrived yet. I have just one day, today, and I'm going to be happy in it. " +
+        "Music in the soul can be heard by the universe. " +
+        "Write while the heat is in you. The writer who postpones the recording of his thoughts uses an iron which has cooled to burn a hole with. He cannot inflame the minds of his audience. " +
+        "Common sense is instinct. Enough of it is genius. " +
+        "A great many people think they are thinking when they are rearranging theirprejudices. " +
+        "There's no scarcity of opportunity to make a living at what you love. There isonly a scarcity of resolve to make it happen. " +
+        "The person who sends out positive thoughts activates the world around him positively and draws back to himself positive results. " +
+        "Inspiration exists, but it has to find us working. " +
+        "Had it not been for you, I should have remained what I was when we first met, a prejudiced, narrow-minded being, with contracted sympathies and false knowledge, wasting my life on obsolete trifles, and utterly insensible to the privilege of living in this wondrous age of change and progress. " +
+        "To think clearly without hurry or confusion; To love everybody sincerely; To act in everything with the highest motives; To trust God unhesitatingly. " +
+        "No one who lived through the Great Depression can ever look upon an unemployed person with anything but compassion. To me, there is no greater tragedy than a breadwinner willing to work, with a job skill but unable to find a market for that job skill. Back in those dark depression days I saw my father on a Christmas eve open what he thought was a Christmas greeting from his boss. Instead, it was the blue slip telling him he no longer had a job. The memory of him sitting there holding that slip of paper and then saying in a half whisper, 'That's quite a Christmas present,' it will stay with me as long as I live. " +
+        "You were not born a winner, and you were not born a loser. You are what you make yourself be. " +
+        "What I cannot love, I overlook " +
+        "As we are liberated from our own fear, our presence automatically liberates others. " +
+        "I want to continue my growth in every way. " +
+        "It is literally true that you can succeed best and quickest by helping others to succeed." +
+        "The world is not respectable; it is mortal, tormented, confused, deluded forever; but it is shot through with beauty, with love, with glints of courage and laughter; and in these, the spirit blooms. " +
+        "All living souls welcome whatever they are ready to cope with; all else they ignore, or pronounce to be monstrous and wrong, or deny to be possible. " +
+        "There is one quality which one must possess to win, and that is definiteness of purpose, the knowledge of what one wants, and a burning desire to possess it. " +
+        "At some point in your life, if you're lucky, you throw practicality to the wind and start living. " +
+        "Eighty percent of success is showing up. " +
+        "My years in your service will always be very special to me. The inspiration you have given me will burn brightly in my heart long after I have left the lights of the White House behind. " +
+        "Obstacles cannot crush me. Every obstacle yields to stern resolve. He who is fixed to a star does not change his mind. " +
+        "Nothing in this world can take the place of persistence. Talent will not; nothing is more common than unsuccessful people with talent. Genius will not; unrewarded genius is almost a proverb. " +
+        "Only through focus can you do world-class things, no matter how capable you are. " +
+        "As every divided kingdom falls, so every mind divided between many studies confounds and saps itself. " +
+        "Face your deficiencies and acknowledge them; but do not let them master you. Let them teach you patience, sweetness, insight. " +
+        "Health is the greatest possession. Contentment is the greatest treasure. Confidence is the greatest friend. Non-being is the greatest joy. " +
+        "The state of your life is nothing more than a reflection of your state of mind. " +
+        "And as we let our own light shine, we unconsciously give other people permission to do the same. " +
+        "Men must live and create. Live to the point of tears. " +
+        "It is common sense to take a method and try it. If it fails, admit it frankly and try another, but above all try something. " +
+        "Happiness resides not in possessions, and not in gold, happiness dwells in the soul. " +
+        "Hope is a waking dream. " +
+        "Thinking: the talking of the soul with itself. " +
+        "What lies behind us and what lies before us are tiny matters compared to what lies within us." +
+        "Do not go where the path may lead, go instead where there is no path and leave a trail. " +
+        "Worry not that no one knows of you; seek to be worth knowing. " +
+        "People only see what they are prepared to see. " +
+        "The longer we dwell on our misfortunes, the greater is their power to harm us. " +
+        "I do not think there is any other quality so essential to success of any kind as the quality of perseverance. It overcomes almost everything, even nature. " +
+        "Life is an opportunity, benefit from it. Life is a beauty, admire it. Life is a dream,realize it. Life is a challenge, meet it. Life is a duty, complete it. Life is a game,play it. Life is a promise, fulfill it. Life is sorrow, overcome it. Life is a song, singit. Life is a struggle, accept it. Life is a tragedy, confront it. Life is an adventure,dare it. Life is luck, make it. Life is life, fight for it! " +
+        "Be vigilant; guard your mind against negative thoughts. " +
+        "Obstacles don't have to stop you. If you run into a wall, don't turn around and give up. Figure out how to climb it, go through it, or work around it. " +
+        "The torpid artist seeks inspiration at any cost, by virtue or by vice, by friend or by fiend, by prayer or by wine. " +
+        "Remember that not getting what you want is sometimes a wonderful stroke of luck. " +
+        "The more you seek security, the less of it you have. But the more you seek opportunity, the more likely it is that you will achieve the security that you desire. " +
+        "What you do speaks so loudly that I cannot hear what you say. " +
+        "Know how to listen, and you will profit even from those who talk badly. " +
+        "Patience and perseverance have a magical effect before which difficulties disappear and obstacles vanish. " +
+        "Only poetry inspires poetry. " +
+        "By necessity, by proclivity, and by delight, we all quote. " +
+        "To be conscious that we are perceiving or thinking is to be conscious of out own existence. " +
+        "We do not yet trust the unknown power of thoughts " +
+        "One never notices what has been done; one can only see what remains to be done. " +
+        "Don't bother just to be better than your contemporaries or predecessors. Try to be better than yourself."
+
+    m = new Markov(quotes + " " + inspire);
+
+    var lines = m.haiku();
+    document.getElementById("line_1").innerText = lines[0];
+    document.getElementById("line_2").innerText = lines[1];
+    document.getElementById("line_3").innerText = lines[2];
+
+
+</script>
 </body>
 </html>
