@@ -121,18 +121,19 @@ Markov.prototype.haikuSearch = function (word, remaining) {
 };
 
 Markov.prototype.haiku = function () {
+    var _this = this;
     var keys = Object.keys(this.startWords);
     var lines = ['goodbye','cruel','world'];
 
-    [5,7,5].forEach(function(n) {
+    [5,7,5].forEach(function(n, i) {
         var start = keys[getRandomInt(keys.length)];
-        var lineWords = this.haikuSearch(start, n - this.words[start].syllables);
+        var lineWords = _this.haikuSearch(start, n - _this.words[start].syllables);
         if (!lineWords) {
-            lines[0] = 'derp ' + start;
+            lines[i] = 'derp ' + start;
             return lines;
         }
 
-        lines[0] = start + " " + lineWords.join(" ");
+        lines[i] = start + " " + lineWords.join(" ");
     });
     return lines;
 };
