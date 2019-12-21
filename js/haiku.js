@@ -1,4 +1,6 @@
 /*
+Generate parts of speech patterns
+
 "one step for man one giant leap for mankind"
 {
     "one" : {
@@ -20,15 +22,19 @@
     }
 }
 */
-function Markov(input) {
+function Haiku(input) {
+    this.wordsByPart = {};
+    this.sentencePatterns = {};
+
     this.words = {};
     this.startWords = {};
+    this.endWords = {};
 
     var text = input;
     if (Array.isArray(input)) {
         text = input.join(" ");
     }
-    var doc = nlp(text);
+    var doc = this.doc = nlp(text);
     doc.contractions().expand();
 
     var _this = this;
@@ -74,19 +80,45 @@ function Markov(input) {
     });
 
     doc.sentences().forEach(function (s) {
+        // for each term extract the part pattern.
+        // concat the tags
+        var terms = s.json(0).terms;
+        var pattern = [];
+        terms.forEach(function (t) {
+            var part = t.tags.join(":");
+            pattern.push(part);
+            if (!_this.wordsByPart[part]) {
+                _this.wordsByPart[part] = {};
+            }
+            _this.wordsByPart[part][t.text.toLowerCase()] = true;
+        });
+        _this.sentencePatterns[pattern.join(" ")] = pattern;
+
         _this.startWords[s.terms().first().text('reduced').toLowerCase()] = true;
-    })
+        _this.endWords[s.terms().last().text('reduced').toLowerCase()] = true;
+    });
+
+    // find a random word pattern
+    var sentencePatterns = _.values(_this.sentencePatterns);
+    var p = sentencePatterns[getRandomInt(sentencePatterns.length)];
+    var out = [];
+    p.forEach(function (p) {
+        var values = _.keys(_this.wordsByPart[p]);
+        out.push(values[getRandomInt(values.length)]);
+    });
+
+    console.log(nlp(out.join(" ")).sentences().toPastTense().text());
 }
 
 function getRandomInt(max) {
     return Math.floor(Math.random() * Math.floor(max));
 }
 
-Markov.prototype.haikuSearch = function (word, remaining) {
+Haiku.prototype.haikuSearch = function (word, remaining) {
     var _this = this;
 
-    if ( remaining < 1 ) {
-        return [word];
+    if (remaining < 1) {
+        return [];
     }
     // start from the last word in the lineWords
     var wordEntry = this.words[word];
@@ -120,25 +152,43 @@ Markov.prototype.haikuSearch = function (word, remaining) {
     return null;
 };
 
-Markov.prototype.haiku = function () {
+Haiku.prototype.haiku = function () {
     var _this = this;
     var keys = Object.keys(this.startWords);
-    var lines = ['goodbye','cruel','world'];
+    var lines = ['goodbye', 'cruel', 'world'];
 
-    [5,7,5].forEach(function(n, i) {
-        var start = keys[getRandomInt(keys.length)];
-        var lineWords = _this.haikuSearch(start, n - _this.words[start].syllables);
+    var start = keys[getRandomInt(keys.length)];
+    [5, 7, 5].forEach(function (n, i) {
+        console.log("start: " + start);
+        var lineWords = _this.haikuSearch(start, n - (i === 0 ? _this.words[start].syllables : 0));
         if (!lineWords) {
             lines[i] = 'derp ' + start;
             return lines;
         }
 
-        lines[i] = start + " " + lineWords.join(" ");
+        var lastWord = lineWords[lineWords.length - 1];
+        if (i === 2 && !_this.endWords[lastWord]) {
+            console.log("find a better end word! ", lineWords);
+            var endWords = _.keys(_this.endWords);
+            var syllables = _this.words[lastWord].syllables;
+            var possibleNextWords = _.filter(endWords, function (w) {
+                return _this.words[w].syllables === syllables
+            });
+
+            if (possibleNextWords.length > 0) {
+                console.log("choosing from ", possibleNextWords);
+                lineWords[lineWords.length - 1] = possibleNextWords[getRandomInt(possibleNextWords.length)];
+                console.log("new line: ", lineWords);
+            }
+        }
+
+        lines[i] = (i > 0 ? "" : start) + " " + lineWords.join(" ");
+        start = lastWord;
     });
     return lines;
 };
 
-Markov.prototype.generate = function (count) {
+Haiku.prototype.generate = function (count) {
     var keys = Object.keys(this.startWords);
     var start = keys[getRandomInt(keys.length)];
     var lastWord = start;
