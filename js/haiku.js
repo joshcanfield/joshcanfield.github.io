@@ -41,7 +41,7 @@ function Haiku(input) {
     var lastWord = '';
     doc.terms().forEach(function (t) {
         var nextWord = t.text('reduced').toLowerCase().trim();
-        if (!nextWord || isFinite(nextWord)) {
+        if (!nextWord || isFinite(nextWord) || !nextWord.match(/\w+/)) {
             return; // skip undesirables
         }
         var entry = _this.words[nextWord];
@@ -152,12 +152,12 @@ Haiku.prototype.haikuSearch = function (word, remaining) {
     return null;
 };
 
-Haiku.prototype.haiku = function () {
+Haiku.prototype.haiku = function (word) {
     var _this = this;
     var keys = Object.keys(this.startWords);
-    var lines = ['goodbye', 'cruel', 'world'];
+    var lines = [['goodbye'], ['cruel'], ['world']];
 
-    var start = keys[getRandomInt(keys.length)];
+    var start = word ? word : keys[getRandomInt(keys.length)];
     [5, 7, 5].forEach(function (n, i) {
         console.log("start: " + start);
         var lineWords = _this.haikuSearch(start, n - (i === 0 ? _this.words[start].syllables : 0));
@@ -182,7 +182,10 @@ Haiku.prototype.haiku = function () {
             }
         }
 
-        lines[i] = (i > 0 ? "" : start) + " " + lineWords.join(" ");
+        if (i === 0) {
+            lineWords.unshift(start);
+        }
+        lines[i] = lineWords;
         start = lastWord;
     });
     return lines;
