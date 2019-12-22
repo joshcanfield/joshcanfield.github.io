@@ -22,6 +22,12 @@ Generate parts of speech patterns
     }
 }
 */
+var notForEnd = {
+    'a': true,
+    'for': true,
+    'with': true,
+    'of': true,
+};
 function Haiku(input) {
     this.wordsByPart = {};
     this.sentencePatterns = {};
@@ -95,7 +101,11 @@ function Haiku(input) {
         _this.sentencePatterns[pattern.join(" ")] = pattern;
 
         _this.startWords[s.terms().first().text('reduced').toLowerCase()] = true;
-        _this.endWords[s.terms().last().text('reduced').toLowerCase()] = true;
+
+        var endWord = s.terms().last().text('reduced').toLowerCase();
+        if (!notForEnd[endWord]) {
+            _this.endWords[endWord] = true;
+        }
     });
 
     // find a random word pattern
