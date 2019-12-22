@@ -23,6 +23,7 @@ Generate parts of speech patterns
 }
 */
 var notForEnd = {
+    'the': true,
     'a': true,
     'for': true,
     'with': true,
