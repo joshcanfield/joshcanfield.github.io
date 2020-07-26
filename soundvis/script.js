@@ -399,7 +399,8 @@ class AudioInput {
         // this.getAudioData = function(data) {this.analyser.getByteFrequencyData(data);};
         // this.dataMaxValue = 256;
 
-        this.getAudioData = function(data) {this.analyser.getByteTimeDomainData(data);};
+        const _this = this;
+        this.getAudioData = function(data) {_this.analyser.getByteTimeDomainData(data);};
         this.dataMaxValue = 128;
 
         this.setFftSize(config.AUDIO_FFT_SIZE);
