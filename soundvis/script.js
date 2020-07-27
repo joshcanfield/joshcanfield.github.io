@@ -56,11 +56,12 @@ let config = {
     // Chrome requires a button click to enable audio
     // @see https://developers.google.com/web/updates/2017/09/autoplay-policy-changes#webaudio
     AUDIO: false,
+    AUDIO_DATA: 'wave',
     AUDIO_SENSITIVITY: 0.1,
     AUDIO_FFT_SIZE: 64,
-    AUDIO_PATTERN: 'middle-out',
-    AUDIO_SETTING_PRESETS: 'jellies',
-    AUDIO_CENTER: false,
+    AUDIO_PATTERN: 'horizontal',
+    AUDIO_SETTING_PRESETS: 'boiling',
+    AUDIO_MIRROR: true,
 
 }
 
@@ -189,11 +190,11 @@ function startGUI () {
     var gui = new dat.GUI({ width: 300 });
     gui.add(config, 'DYE_RESOLUTION', { 'high': 1024, 'medium': 512, 'low': 256, 'very low': 128 }).name('quality').onFinishChange(initFramebuffers);
     gui.add(config, 'SIM_RESOLUTION', { '32': 32, '64': 64, '128': 128, '256': 256 }).name('sim resolution').onFinishChange(initFramebuffers);
-    gui.add(config, 'DENSITY_DISSIPATION', 0, 4.0).name('density diffusion');
-    gui.add(config, 'VELOCITY_DISSIPATION', 0, 4.0).name('velocity diffusion');
-    gui.add(config, 'PRESSURE', 0.0, 1.0).name('pressure');
-    gui.add(config, 'CURL', 0, 50).name('vorticity').step(1);
-    gui.add(config, 'SPLAT_RADIUS', 0.01, 1.0).name('splat radius');
+    gui.add(config, 'DENSITY_DISSIPATION', 0, 4.0).name('density diffusion').listen();
+    gui.add(config, 'VELOCITY_DISSIPATION', 0, 4.0).name('velocity diffusion').listen();
+    gui.add(config, 'PRESSURE', 0.0, 1.0).name('pressure').listen();
+    gui.add(config, 'CURL', 0, 50).name('vorticity').step(1).listen();
+    gui.add(config, 'SPLAT_RADIUS', 0.01, 1.0).name('splat radius').listen();
     gui.add(config, 'SHADING').name('shading').onFinishChange(updateKeywords);
     gui.add(config, 'COLORFUL').name('colorful');
     gui.add(config, 'PAUSED').name('paused').listen();
@@ -203,12 +204,12 @@ function startGUI () {
         } }, 'fun').name('Random splats');
 
     let bloomFolder = gui.addFolder('Bloom');
-    bloomFolder.add(config, 'BLOOM').name('enabled').onFinishChange(updateKeywords);
+    bloomFolder.add(config, 'BLOOM').name('enabled').onFinishChange(updateKeywords).listen();
     bloomFolder.add(config, 'BLOOM_INTENSITY', 0.1, 2.0).name('intensity');
     bloomFolder.add(config, 'BLOOM_THRESHOLD', 0.0, 1.0).name('threshold');
 
     let sunraysFolder = gui.addFolder('Sunrays');
-    sunraysFolder.add(config, 'SUNRAYS').name('enabled').onFinishChange(updateKeywords);
+    sunraysFolder.add(config, 'SUNRAYS').name('enabled').onFinishChange(updateKeywords).listen();
     sunraysFolder.add(config, 'SUNRAYS_WEIGHT', 0.3, 1.0).name('weight');
 
     let captureFolder = gui.addFolder('Capture');
@@ -220,8 +221,9 @@ function startGUI () {
     audioFolder.add(config, 'AUDIO').name('enabled').onFinishChange(updateAudio);
     audioFolder.add(config, 'AUDIO_SENSITIVITY', 0.01, 1.0).name("sensitivity").listen();
     audioFolder.add(config, 'AUDIO_FFT_SIZE', {'low': 32, 'med': 64, 'high': 256}).name('sample level');
+    audioFolder.add(config, 'AUDIO_DATA', ['wave', 'frequency']).name('data');
     audioFolder.add(config, 'AUDIO_PATTERN', ['vertical', 'horizontal', 'chaos', 'middle-out']).name('pattern');
-    audioFolder.add(config, 'AUDIO_CENTER').name('center');
+    audioFolder.add(config, 'AUDIO_MIRROR').name('mirror');
     audioFolder.add(config, 'AUDIO_SETTING_PRESETS', ['boiling', 'jellies']).name('presets').onFinishChange(updatePresets);
 
     let github = gui.add({ fun : () => {
@@ -396,13 +398,8 @@ class AudioInput {
         this.analyser.minDecibels = -90;
         this.analyser.maxDecibels = -10;
         this.analyser.smoothingTimeConstant = 0.85;
-        // this.getAudioData = function(data) {this.analyser.getByteFrequencyData(data);};
-        // this.dataMaxValue = 256;
 
-        const _this = this;
-        this.getAudioData = function(data) {_this.analyser.getByteTimeDomainData(data);};
-        this.dataMaxValue = 128;
-
+        this.setDataSource(config.AUDIO_DATA);
         this.setFftSize(config.AUDIO_FFT_SIZE);
 
         // Older browsers might not implement mediaDevices at all, so we set an empty object first
@@ -467,7 +464,7 @@ class AudioInput {
                 return function () {
                     self.draw()
                 }
-            })(this), 100);
+            })(this), 1000/24);
     }
 
     stop() {
@@ -476,6 +473,79 @@ class AudioInput {
     }
 
     draw() {
+        this.updateFromConfig();
+        let dataArray = this.oddEven ? this.oddDataArray : this.evenDataArray;
+        let lastDataArray = this.oddEven ? this.evenDataArray : this.oddDataArray;
+        this.oddEven = this.oddEven ? 0 : 1;
+        this.getAudioData(dataArray);
+
+        // center
+        if (config.AUDIO_PATTERN === 'middle-out') {
+            this.renderMiddleOut(lastDataArray, dataArray);
+        } else {
+            let edges;
+            if (config.AUDIO_PATTERN === 'horizontal') {
+                edges = ['bottom'];
+                if (config.AUDIO_MIRROR) {
+                    edges.push('top');
+                }
+            } else if (config.AUDIO_PATTERN === 'chaos') {
+                edges = ['bottom', 'top', 'left', 'right'];
+            } else if (config.AUDIO_PATTERN === 'vertical') {
+                edges = ['right']
+                if (config.AUDIO_MIRROR) {
+                    edges.push('left');
+                }
+            }
+
+            const edgeSize = edges.length;
+            for (let i = 1; i <= this.bufferLength; ++i) {
+                const change = Math.abs(lastDataArray[i - 1] - dataArray[i - 1]) / this.dataMaxValue;
+                if (change > config.AUDIO_SENSITIVITY) {
+                    return;
+                }
+                const edge = edges[i % edgeSize];
+                if (edge === 'bottom') {
+                    this.bottomUp(i, dataArray, edgeSize === 1);
+                } else if (edge === 'top') {
+                    this.topDown(i, dataArray);
+                } else if (edge === 'right') {
+                    this.rightToLeft(i, dataArray, edgeSize === 1);
+                } else if (edge === 'left') {
+                    this.leftToRight(i, dataArray);
+                }
+            }
+        }
+    }
+
+
+    renderMiddleOut(lastDataArray, dataArray) {
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+
+        for (let i = 1; i <= this.bufferLength; ++i) {
+            const change = Math.abs(lastDataArray[i - 1] - dataArray[i - 1]) / this.dataMaxValue;
+            if (change < config.AUDIO_SENSITIVITY) {
+                let pointer = pointers[i]
+                const x = centerX;
+                let y;
+                if (this.dataSource === 'wave') {
+                    y = ((lastDataArray[i - 1] / this.dataMaxValue) * canvas.height) - centerY;
+                } else {
+                    y = (((this.dataMaxValue- lastDataArray[i - 1]) / this.dataMaxValue) * canvas.height) - centerY;
+                }
+                let angle = i * (Math.PI * 2 / this.bufferLength);
+                let cosAngle = Math.cos(angle);
+                let sinAngle = Math.sin(angle);
+                const xRot = cosAngle * (x - centerX) - sinAngle * (y - centerY) + centerX;
+                const yRot = sinAngle * (x - centerX) - cosAngle * (y - centerY) + centerY;
+
+                updatePointerMoveData(pointer, xRot, yRot);
+            }
+        }
+    }
+
+    updateFromConfig() {
         if (parseInt(this.analyser.fftSize) !== parseInt(config.AUDIO_FFT_SIZE)) {
             console.log("change fft size", config.AUDIO_FFT_SIZE, this.analyser.fftSize);
             this.setFftSize(config.AUDIO_FFT_SIZE);
@@ -483,110 +553,78 @@ class AudioInput {
                 pointers.push(new pointerPrototype());
             }
         }
-        let dataArray = this.oddEven ? this.oddDataArray : this.evenDataArray;
-        let lastDataArray = this.oddEven ? this.evenDataArray : this.oddDataArray;
-        this.oddEven = this.oddEven ? 0 : 1;
-        this.getAudioData(dataArray);
 
-        if (config.AUDIO_PATTERN === 'vertical') {
-            this.drawVertical(lastDataArray, dataArray);
-        } else if (config.AUDIO_PATTERN === 'chaos') {
-            for (let i = 1; i <= this.bufferLength; ++i) {
-                const change = Math.abs(lastDataArray[i - 1] - dataArray[i - 1]) / this.dataMaxValue;
-                if (change > config.AUDIO_SENSITIVITY) {
-                    return;
-                }
-                if (i % 4 === 0) {
-                    this.bottomUp(i, dataArray, config.AUDIO_CENTER);
-                } else if (i % 3 === 1) {
-                    this.topDown(i, dataArray, config.AUDIO_CENTER);
-                } else if (i % 3 === 2) {
-                    this.leftToRight(i, dataArray, config.AUDIO_CENTER);
-                } else {
-                    this.rightToLeft(i, dataArray, config.AUDIO_CENTER);
-                }
-            }
-        } else if (config.AUDIO_PATTERN === 'horizontal') {
-            for (let i = 1; i <= this.bufferLength; ++i) {
-                const change = Math.abs(lastDataArray[i - 1] - dataArray[i - 1]) / this.dataMaxValue;
-                if (change > config.AUDIO_SENSITIVITY) {
-                    return;
-                }
-                if (i % 2 === 0) {
-                    this.rightToLeft(i, dataArray, config.AUDIO_CENTER);
-                } else {
-                    this.leftToRight(i, dataArray, config.AUDIO_CENTER);
-                }
-            }
-        } else if (config.AUDIO_PATTERN === 'middle-out') {
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-
-            for (let i = 1; i <= this.bufferLength; ++i) {
-                const change = Math.abs(lastDataArray[i - 1] - dataArray[i - 1]) / this.dataMaxValue;
-                if (change < config.AUDIO_SENSITIVITY) {
-                    let pointer = pointers[i]
-                    const x = centerX;
-                    const y = (lastDataArray[i - 1] / this.dataMaxValue * canvas.height) - centerY;
-                    let angle = i * (Math.PI * 2 / this.bufferLength);
-                    let cosAngle = Math.cos(angle);
-                    let sinAngle = Math.sin(angle);
-                    const xRot = cosAngle * (x - centerX) - sinAngle * (y - centerY) + centerX;
-                    const yRot = sinAngle * (x - centerX) - cosAngle * (y - centerY) + centerY;
-                    updatePointerMoveData(pointer, xRot, yRot);
-                }
-            }
+        if (config.AUDIO_DATA !== this.dataSource ) {
+            this.setDataSource(config.AUDIO_DATA);
         }
-    }
-
-
-    drawVertical(lastDataArray, dataArray) {
-        for (let i = 1; i <= this.bufferLength; ++i) {
-            const change = Math.abs(lastDataArray[i - 1] - dataArray[i - 1]) / this.dataMaxValue;
-            if (change < config.AUDIO_SENSITIVITY) {
-                this.bottomUp(i, dataArray, config.AUDIO_CENTER);
-            }
-        }
-    }
-
-    topDown(i, dataArray, center) {
-        let pointer = pointers[i]
-        const x = i / this.bufferLength * canvas.width;
-        let y = (this.dataMaxValue - dataArray[i - 1]) / this.dataMaxValue * canvas.height;
-        if (center) {
-            y += canvas.height / 2
-        }
-        updatePointerMoveData(pointer, x, y);
     }
 
     bottomUp(i, dataArray, center) {
         let pointer = pointers[i]
         const x = i / this.bufferLength * canvas.width;
-        let y = dataArray[i - 1] / this.dataMaxValue * canvas.height;
-        if (center) {
-            y -= canvas.height / 2
+        // wave treats 128 as the zero line
+        // frequency is 0 -> 255
+        let y;
+        if (this.dataSource === 'wave')  {
+            y = dataArray[i - 1] / this.dataMaxValue * canvas.height;
+            if (center) {
+                y -= canvas.height/2
+            }
+        } else {
+            y = (this.dataMaxValue - dataArray[i - 1]) / this.dataMaxValue * canvas.height;
+        }
+        updatePointerMoveData(pointer, x, y);
+    }
+
+    topDown(i, dataArray) {
+        let pointer = pointers[i]
+        const x = i / this.bufferLength * canvas.width;
+        let y;
+        if ( this.dataSource === 'wave') {
+            y = (this.dataMaxValue - dataArray[i - 1]) / this.dataMaxValue * canvas.height;
+        } else {
+            y = dataArray[i - 1] / this.dataMaxValue * canvas.height;
         }
         updatePointerMoveData(pointer, x, y);
     }
 
     rightToLeft(i, dataArray, center) {
         let pointer = pointers[i]
-        let x = (this.dataMaxValue - dataArray[i - 1]) / this.dataMaxValue * canvas.width;
-        const y = i / this.bufferLength * canvas.height;
-        if (center) {
-            x += canvas.width / 2;
+        let x;
+        if (this.dataSource === 'wave') {
+            x = (this.dataMaxValue - dataArray[i - 1]) / this.dataMaxValue * canvas.width;
+            if (center) {
+                x -= canvas.width/2;
+            }
+        } else {
+            x = dataArray[i - 1] / this.dataMaxValue * canvas.width;
         }
+        const y = i / this.bufferLength * canvas.height;
         updatePointerMoveData(pointer, x, y);
     }
 
     leftToRight(i, dataArray, center) {
         let pointer = pointers[i]
-        let x = dataArray[i - 1] / this.dataMaxValue * canvas.width;
-        const y = i / this.bufferLength * canvas.height;
-        if (center) {
-            x += canvas.width / 2;
+        let x;
+        if (this.dataSource === 'wave') {
+            x = dataArray[i - 1] / this.dataMaxValue * canvas.width;
+        } else {
+            x = (this.dataMaxValue - dataArray[i - 1]) / this.dataMaxValue * canvas.width;
         }
+        const y = i / this.bufferLength * canvas.height;
         updatePointerMoveData(pointer, x, y);
+    }
+
+    setDataSource(audioDataType) {
+        const _this = this;
+        this.dataSource = audioDataType;
+        if (audioDataType === 'wave') {
+            this.getAudioData = function(data) {_this.analyser.getByteTimeDomainData(data);};
+            this.dataMaxValue = 128;
+        } else {
+            this.getAudioData = function(data) {_this.analyser.getByteFrequencyData(data);};
+            this.dataMaxValue = 256;
+        }
     }
 }
 
